@@ -1647,14 +1647,37 @@ try {
     Update-Step -icon "[DOWN]" -text "Downloading $BrandName..." -percent 50
     Write-Log "Connecting to download server..." -type highlight
 
-    $wc = New-Object System.Net.WebClient
-    $wc.DownloadFile($ExeUrl, $ExePath)
-    $wc.Dispose()
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile($ExeUrl, $ExePath)
+        $wc.Dispose()
+    } catch {
+        if (Test-Path $ExePath) { Remove-Item $ExePath -Force -ErrorAction SilentlyContinue }
+        Show-Error "Download failed: $($_.Exception.Message)"
+    }
     Start-Sleep -Seconds 1
 
-    if (!(Test-Path $ExePath)) { Show-Error "Download failed" }
+    if (!(Test-Path $ExePath)) { Show-Error "Download failed - output file missing" }
     $exeSize = (Get-Item $ExePath).Length
-    if ($exeSize -lt 100KB) { Show-Error "Downloaded file is invalid" }
+    if ($exeSize -lt 100KB) {
+        Remove-Item $ExePath -Force -ErrorAction SilentlyContinue
+        Show-Error "Downloaded file is invalid or incomplete ($([math]::Round($exeSize/1KB, 1)) KB)"
+    }
+
+    # Validate PE header (Windows Executable 'MZ' magic bytes)
+    try {
+        $fs = [System.IO.File]::OpenRead($ExePath)
+        $b1 = $fs.ReadByte()
+        $b2 = $fs.ReadByte()
+        $fs.Close()
+        if ($b1 -ne 0x4D -or $b2 -ne 0x5A) {
+            Remove-Item $ExePath -Force -ErrorAction SilentlyContinue
+            Show-Error "Downloaded file is not a valid Windows executable (PE header 'MZ' missing)"
+        }
+    } catch {
+        Show-Error "Failed to validate downloaded file structure"
+    }
+
     Write-Log "Application downloaded ($([math]::Round($exeSize/1MB, 1)) MB)" -type success
 
     # Check & install Visual C++ Redistributable 2015-2022 x64
